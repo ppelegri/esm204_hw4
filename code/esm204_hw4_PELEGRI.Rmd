@@ -1,0 +1,138 @@
+---
+title: 'ESM 204: HW4'
+author: "Patrick Pelegri-O'Day"
+date: "5/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+library(scales)
+library(broom)
+library(patchwork)
+```
+
+```{r}
+damages_df <- read_csv(here("data", "damages.csv")) %>% 
+  clean_names()
+warming_df <- read_csv(here('data', 'warming.csv')) %>% 
+  clean_names() %>% 
+  select(-x1)
+``` 
+
+1. Using damages.csv, estimate a quadratic damage function relating the dollar value of damages
+to the change in global mean temperature. Estimate a model with a zero intercept because
+damages by construction must equal zero when there is no climate change. Plot your estimated
+damage function, overlaid with a scatterplot of the underlying data.*
+
+```{r}
+# Create vector of squared temperature for quadratic model
+damages_df$warming2 <- damages_df$warming^2
+
+# Define quadratic model for climate damages with 0 intercept
+damages_lm <- lm(damages ~ 0 + warming + warming2, data = damages_df)
+
+# Predict damages
+damages_predict <- predict(damages_lm)
+
+# Add predicted values to damages_df
+damages_df <- damages_df %>% 
+  mutate(predicted_damages = damages_predict)
+```
+
+```{r}
+# Plot predicted damages
+ggplot(data = damages_df, aes(x = warming)) + 
+  geom_point(aes(y = damages), size = 1, color = 'gray70') +
+  geom_line(aes(y = predicted_damages), size = 0.8, color = 'steelblue4') +
+  theme_minimal() + 
+  # scale_y_continuous(labels = comma) + # would convert scale but then it's unreadable
+  labs(x = 'Warming (C)', y = 'Damages (USD)')
+```
+**Figure 1.** Estimated damages (USD) per unit of additional warming (Celsius) using a quadratic regression.
+
+
+2. Use warming.csv and your estimated damage function to predict damages in each year under
+the baseline climate and the pulse scenario. Make four plots: (1) damages over time without
+the pulse, (2) damages over time with the pulse, (3) the difference in damages over time that
+arises from the pulse, and (4) the difference in damages over time from the pulse per ton of
+CO2 (you can assume that each ton of the pulse causes the same amount of damage).
+
+```{r}
+# Create tidy version of model so it's easier to call values
+damages_lm_tidy <- tidy(damages_lm)
+```
+
+```{r}
+# Create damages function
+damages_func <- function(temp){
+  damages = damages_lm_tidy$estimate[1]*(temp) + damages_lm_tidy$estimate[2]*((temp)^2)
+  return(damages)
+}
+```
+
+```{r}
+# PREP FOR Q2 PLOTS
+
+# Create columns of damages for baseline and pulse based on damages function calculated above
+warming_df <- warming_df %>% 
+  mutate(damages_baseline = damages_func(warming_baseline)) %>% 
+  mutate(damages_pulse = damages_func(warming_pulse))
+
+# Create column of additional damages from the pulse
+warming_df <- warming_df %>% 
+  mutate(damages_addtl = damages_pulse - damages_baseline)
+
+# Create column of additional damages from the pulse *per ton of CO2*
+warming_df <- warming_df %>% 
+  mutate(damages_addtl_perton = (damages_pulse - damages_baseline)/(35*10^9))
+```
+
+```{r}
+# Q2 plots
+
+# Plot of damages under baseline
+baseline_dmg_plot <- ggplot(warming_df, aes(x = year, y = damages_baseline)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = 'Year', y = 'Damages (USD)', title = 'Damages under baseline')
+
+# Plot of damages under pulse
+pulse_dmg_plot <- ggplot(warming_df, aes(x = year, y = damages_pulse)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = 'Year', y = 'Damages (USD)', title = 'Damages with pulse')
+
+# Plot of additional damages from pulse
+addtl_dmg_plot <- ggplot(warming_df, aes(x = year, y = damages_addtl)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = 'Year', y = 'Damages (USD)', title = 'Additional damages from pulse')
+
+# Plot of additional damages from pulse per ton of CO2
+addtl_dmg_perton_plot <- ggplot(warming_df, aes(x = year, y = damages_addtl_perton)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = 'Year', y = 'Damages (USD)', title = 'Additional damages from pulse \n per ton of CO2')
+
+q2_plots <- (baseline_dmg_plot + pulse_dmg_plot)/(addtl_dmg_plot + addtl_dmg_perton_plot)
+q2_plots
+```
+
+
+
+3. The SCC is the present discounted value of the stream of future damages caused by one
+additional ton of CO2. The Obama Administration used a discount rate of 3% to discount
+damages. Recently, New York State used a discount rate of 2%. Calculate and make a plot
+of the SCC (y-axis) against the discount rate (x-axis) for a reasonable range of discount rates.
+Explain the intuition for how the discount rate affects the SCC.
+
+4. The National Academies of Sciences, Engineering, and Medicine advised the government in a
+2017 report to use the Ramsey Rule when discounting within the SCC calculation:
+r = p + ng
+Using p = 0:001, n = 2, and g = 0:01, what is the SCC? Locate this point on your graph from
+above.
