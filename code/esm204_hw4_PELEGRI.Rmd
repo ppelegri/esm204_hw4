@@ -2,7 +2,11 @@
 title: 'ESM 204: HW4'
 author: "Patrick Pelegri-O'Day"
 date: "5/18/2022"
-output: html_document
+output:
+  html_document: 
+    theme: flatly
+    highlight: pygments
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning = FALSE}
@@ -24,10 +28,7 @@ warming_df <- read_csv(here('data', 'warming.csv')) %>%
   select(-x1)
 ``` 
 
-1. Using damages.csv, estimate a quadratic damage function relating the dollar value of damages
-to the change in global mean temperature. Estimate a model with a zero intercept because
-damages by construction must equal zero when there is no climate change. Plot your estimated
-damage function, overlaid with a scatterplot of the underlying data.*
+### Question 1
 
 ```{r}
 # Create vector of squared temperature for quadratic model
@@ -53,14 +54,11 @@ ggplot(data = damages_df, aes(x = warming)) +
   # scale_y_continuous(labels = comma) + # would convert scale but then it's unreadable
   labs(x = 'Warming (C)', y = 'Damages (USD)')
 ```
+
 **Figure 1.** Estimated damages (USD) per unit of additional warming (Celsius) using a quadratic regression.
 
 
-2. Use warming.csv and your estimated damage function to predict damages in each year under
-the baseline climate and the pulse scenario. Make four plots: (1) damages over time without
-the pulse, (2) damages over time with the pulse, (3) the difference in damages over time that
-arises from the pulse, and (4) the difference in damages over time from the pulse per ton of
-CO2 (you can assume that each ton of the pulse causes the same amount of damage).
+### Question 2
 
 ```{r}
 # Create tidy version of model so it's easier to call values
@@ -124,12 +122,40 @@ q2_plots
 ```
 
 
-
 3. The SCC is the present discounted value of the stream of future damages caused by one
 additional ton of CO2. The Obama Administration used a discount rate of 3% to discount
 damages. Recently, New York State used a discount rate of 2%. Calculate and make a plot
 of the SCC (y-axis) against the discount rate (x-axis) for a reasonable range of discount rates.
 Explain the intuition for how the discount rate affects the SCC.
+
+We want to calculate the present value of damages from year 2022 to 2100.
+
+Integral from x = 2022 to x = 2100 of damage(x)/(1+r)^t
+
+```{r}
+# BUILD UP TO SCC FUNCTION
+
+# Create column t for the purpose of calculating integral
+warming_df <- warming_df %>% 
+  mutate(t = year - 2021)
+
+# Create function of damages based on year based on warming_df
+addtl_dmg_func <- function(t){
+  addtl_dmg = warming_df$damages_addtl_perton[t]
+  return(addtl_dmg)
+}
+
+# Calculate SCC
+scc_func <- function(r, t){
+  scc = integrate(addtl_dmg_func()/((1+r)^t), 1, 79)
+  return(scc)
+}
+
+scc_func(2)
+
+#### Question: how do I integrate this thing in R?
+```
+
 
 4. The National Academies of Sciences, Engineering, and Medicine advised the government in a
 2017 report to use the Ramsey Rule when discounting within the SCC calculation:
