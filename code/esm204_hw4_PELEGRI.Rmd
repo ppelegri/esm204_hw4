@@ -121,44 +121,78 @@ q2_plots <- (baseline_dmg_plot + pulse_dmg_plot)/(addtl_dmg_plot + addtl_dmg_per
 q2_plots
 ```
 
+**Figure 2.** Estimation of climate damages under different scenarios.
 
-3. The SCC is the present discounted value of the stream of future damages caused by one
-additional ton of CO2. The Obama Administration used a discount rate of 3% to discount
-damages. Recently, New York State used a discount rate of 2%. Calculate and make a plot
-of the SCC (y-axis) against the discount rate (x-axis) for a reasonable range of discount rates.
-Explain the intuition for how the discount rate affects the SCC.
-
-We want to calculate the present value of damages from year 2022 to 2100.
-
-Integral from x = 2022 to x = 2100 of damage(x)/(1+r)^t
+### Question 3
 
 ```{r}
-# BUILD UP TO SCC FUNCTION
+# BUILD UP TO DF OF SCC & DISCOUNT RATES
 
-# Create column t for the purpose of calculating integral
-warming_df <- warming_df %>% 
-  mutate(t = year - 2021)
-
-# Create function of damages based on year based on warming_df
-addtl_dmg_func <- function(t){
-  addtl_dmg = warming_df$damages_addtl_perton[t]
-  return(addtl_dmg)
+# Create function of damages in present value based on year based on warming_df
+addtl_dmg_pv_func <- function(addtl_dmg, r){
+  addtl_dmg_pv = sum(addtl_dmg/((1+r)^c(1:length(addtl_dmg))))
+  return(addtl_dmg_pv)
 }
 
-# Calculate SCC
-scc_func <- function(r, t){
-  scc = integrate(addtl_dmg_func()/((1+r)^t), 1, 79)
-  return(scc)
+# Define terms for use in function above
+addtl_dmg <- warming_df$damages_addtl_perton 
+r <- seq(0, 0.1, 0.005) # Calculate for r (discount rate) values from 0 to 10% in 0.5% increments
+scc <- numeric() # Create empty vector for scc values to be put into
+
+# Create vector scc that contains scc values at different discount rates
+for(i in 1:length(r)){
+  scc[i] <- addtl_dmg_pv_func(addtl_dmg,r[i])
 }
 
-scc_func(2)
-
-#### Question: how do I integrate this thing in R?
+# Make df of scc values and discount rates
+scc_df <- data.frame(scc) %>% 
+  mutate(discount_rate_pct = 100*r)
 ```
 
+```{r}
+# Plot scc against discount rate
+ggplot(scc_df, aes(x = discount_rate_pct, y = scc)) +
+  geom_line() +
+  theme_minimal() + 
+  labs(x = 'Discount rate (percentage)', y = 'Social Cost of Carbon (USD)')
+```
 
-4. The National Academies of Sciences, Engineering, and Medicine advised the government in a
-2017 report to use the Ramsey Rule when discounting within the SCC calculation:
-r = p + ng
-Using p = 0:001, n = 2, and g = 0:01, what is the SCC? Locate this point on your graph from
-above.
+**Figure 3.** Social cost of carbon per discount rate.
+
+**Explanation:** The SCC decreases as the discount rate increases because the SCC is based on the present value of future climate-related damages from greenhouse gas emissions. The higher the discount rate, the lower the cost of future damages in present-day terms.
+
+### Question 4
+
+The Ramsey Rule is r = p + ng
+
+```{r}
+scc_0.021dr <- addtl_dmg_pv_func(addtl_dmg, 0.021)
+```
+
+Given p = 0.001, n = 2, and g = 0.01, r = 0.021. This corresponds to an SCC of `r round(scc_0.021dr, 1)`
+
+Figure 3 is reproduced below with this point highlighted.
+
+```{r}
+# Create df with the Ramsey Rule point for plotting
+ramsey_rule_v <- c(69.88626, 2.1)
+ramsey_rule_df <- scc_df %>%
+  rbind(ramsey_rule_v) %>%
+  filter(discount_rate_pct == 2.1)
+```
+
+```{r}
+# Plot scc against discount rate
+ggplot() +
+  geom_point(data = ramsey_rule_df, 
+             aes(x = discount_rate_pct, y = scc),
+             color = 'violetred4',
+             size = 2.5) +
+ annotate("text", x = 3.15, y = 77, label = "Highlighted SCC") +
+ geom_line(data = scc_df,
+           aes(x = discount_rate_pct, y = scc)) +
+  theme_minimal() + 
+  labs(x = 'Discount rate (percentage)', y = 'Social Cost of Carbon (USD)')
+```
+
+**Figure 4.** Social cost of carbon (SCC) per discount rate, with the SCC for a discount rate based on the Ramsey Rule highlighted.
