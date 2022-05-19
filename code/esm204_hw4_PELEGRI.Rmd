@@ -208,7 +208,7 @@ warming_df <- warming_df %>%
 
 ```{r}
 # Create function to compare present value of climate policies
-policy_compare_f <- function(dmg_v){
+policy_compare_f <- function(dmg_v){ 
   pv <- sum(dmg_v/((1.02)^c(1:length(warming_df$dmg_v)))) # Note a discount rate of 0.02 is used
   return(pv)
 }
@@ -218,7 +218,35 @@ policy_compare_f <- function(dmg_v){
 #     - Policy B: sum of damages using modified baseline, where modified baseline uses 1.29 degrees after 2050
 ```
 
-Given a risk neutral outlook, Policy A leads to an expected present value of climate damages up to 2100 of `r round(0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5), 2)`. Policy B has an expected present value of `r round(policy_compare_f(warming_df$damages_baseline_b), 2)`.
+Given a risk neutral outlook, Policy A leads to an expected present value of climate damages up to 2100 of `r round(0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5))`. Policy B has an expected present value of `r round(policy_compare_f(warming_df$damages_baseline_b))`.
 
- - CHANGE IN-LINE REFERENCES ABOVE TO BILLIONS OF USD RATHER THAN SCIENTIFIC NOTATION
- - NEXT STEP IS GRAPHING TOTAL POLICY COSTS AGAINST X WHERE X IS COST OF POLICY B
+```{r}
+# Create df for graphing cost comparison
+policy_compare_df <- data.frame(matrix(ncol = 1, nrow = 79))
+
+# Create column x (costs of Policy B) for graphing. I chose an arbitrary range of values from 0 to 78 x 10^14 for illustrative purposes
+policy_compare_df$x = seq(0, 78*10^14, 10^14)
+
+# Create column for Policy A cost and Policy B cost
+policy_compare_df$a = 0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5) # column of Policy A costs
+
+policy_compare_df$b = policy_compare_f(warming_df$damages_baseline_b) + policy_compare_df$x # column of Policy B costs
+
+policy_compare_df <- policy_compare_df %>% # remove initial column and pivot longer for graphing
+  select(x, a, b) %>% 
+  pivot_longer(a:b, 
+               names_to = 'policy', 
+               values_to = 'cost')
+
+```
+
+```{r}
+# Graph x against cost of both policies
+ggplot(policy_compare_df, aes(x = x, y = cost)) +
+  geom_line(aes(color = policy)) +
+  theme_minimal()
+```
+
+**Figure 5.** Comparing the societal cost of pursuing Climate Policy A vs. Climate Policy B as a function of the implementation cost of Climate Policy B.
+
+Policy B leads to less societal cost considering climate damages and policy implementation costs when implementation costs are less than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`. Thus, I recommend Congress pursue Policy B if expected implementation costs of the policy are less than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`, and I recommend Congress pursue Policy A if expected implementation costs of Policy B are more than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`.
