@@ -16,9 +16,14 @@ library(tidyverse)
 library(here)
 library(janitor)
 library(scales)
-library(broom)
 library(patchwork)
 ```
+
+### Initial note
+
+ - No explanatory text is provided beyond what is explicitly asked for in the homework.
+ - Organized code and explanation of work is provided in the folded code chunks.
+
 
 ```{r}
 damages_df <- read_csv(here("data", "damages.csv")) %>% 
@@ -43,15 +48,19 @@ damages_predict <- predict(damages_lm)
 # Add predicted values to damages_df
 damages_df <- damages_df %>% 
   mutate(predicted_damages = damages_predict)
+
+# The in-line text being called is:
+# $y$ = `r damages_lm$coefficients[1]`$x$ + `r damages_lm$coefficients[2]`$x^2$. 
 ```
+
+A quadratic function relating damages to temperature is $y$ = `r damages_lm$coefficients[1]`$x$ + `r damages_lm$coefficients[2]`$x^2$. 
 
 ```{r}
 # Plot predicted damages
 ggplot(data = damages_df, aes(x = warming)) + 
-  geom_point(aes(y = damages), size = 1, color = 'gray70') +
-  geom_line(aes(y = predicted_damages), size = 0.8, color = 'steelblue4') +
+  geom_point(aes(y = damages), size = 1, color = 'gray83') +
+  geom_line(aes(y = predicted_damages), size = 0.8, color = 'black') +
   theme_minimal() + 
-  # scale_y_continuous(labels = comma) + # would convert scale but then it's unreadable
   labs(x = 'Warming (C)', y = 'Damages (USD)')
 ```
 
@@ -61,14 +70,9 @@ ggplot(data = damages_df, aes(x = warming)) +
 ### Question 2
 
 ```{r}
-# Create tidy version of model so it's easier to call values
-damages_lm_tidy <- tidy(damages_lm)
-```
-
-```{r}
 # Create damages function
 damages_func <- function(temp){
-  damages = damages_lm_tidy$estimate[1]*(temp) + damages_lm_tidy$estimate[2]*((temp)^2)
+  damages = damages_lm$coefficients[1]*(temp) + damages_lm$coefficients[2]*((temp)^2)
   return(damages)
 }
 ```
@@ -163,13 +167,16 @@ ggplot(scc_df, aes(x = discount_rate_pct, y = scc)) +
 
 ### Question 4
 
-The Ramsey Rule is r = p + ng
+The Ramsey Rule is r = p + ng. Given p = 0.001, n = 2, and g = 0.01: r = 0.021. 
 
 ```{r}
 scc_0.021dr <- addtl_dmg_pv_func(addtl_dmg, 0.021)
+
+# The in-line text being called is:
+# This corresponds to an SCC of `r round(scc_0.021dr, 1)`
 ```
 
-Given p = 0.001, n = 2, and g = 0.01, r = 0.021. This corresponds to an SCC of `r round(scc_0.021dr, 1)`
+This corresponds to an SCC of `r round(scc_0.021dr, 1)`
 
 Figure 3 is reproduced below with this point highlighted.
 
@@ -216,25 +223,30 @@ policy_compare_f <- function(dmg_v){
 ### Calculations to be done in-line
 #     - Policy A: 0.5 * sum of damages using baseline + 0.5 * 1.5(sum of damages using baseline)
 #     - Policy B: sum of damages using modified baseline, where modified baseline uses 1.29 degrees after 2050
+
+# Define present value of Policy A and Policy B as objects for reference in-line
+a_pv <- 0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)
+
+b_pv <- policy_compare_f(warming_df$damages_baseline_b)
 ```
 
-Given a risk neutral outlook, Policy A leads to an expected present value of climate damages up to 2100 of `r round(0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5))`. Policy B has an expected present value of `r round(policy_compare_f(warming_df$damages_baseline_b))`.
+Given a risk neutral outlook, Policy A leads to an expected present value of climate damages up to 2100 of `r a_pv`. Policy B has an expected present value of `r b_pv`.
 
 ```{r}
 # Create df for graphing cost comparison
 policy_compare_df <- data.frame(matrix(ncol = 1, nrow = 79))
 
-# Create column x (costs of Policy B) for graphing. I chose an arbitrary range of values from 0 to 78 x 10^14 for illustrative purposes
+# Create column x (costs of Policy B) for graphing. I chose a range of values from 0 to 78 x 10^14 to show where Policy B becomes more expensive in present value than Policy A.
 policy_compare_df$x = seq(0, 78*10^14, 10^14)
 
 # Create column for Policy A cost and Policy B cost
-policy_compare_df$a = 0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5) # column of Policy A costs
+policy_compare_df$A = 0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5) # column of Policy A costs
 
-policy_compare_df$b = policy_compare_f(warming_df$damages_baseline_b) + policy_compare_df$x # column of Policy B costs
+policy_compare_df$B = policy_compare_f(warming_df$damages_baseline_b) + policy_compare_df$x # column of Policy B costs
 
 policy_compare_df <- policy_compare_df %>% # remove initial column and pivot longer for graphing
-  select(x, a, b) %>% 
-  pivot_longer(a:b, 
+  select(x, A, B) %>% 
+  pivot_longer(A:B, 
                names_to = 'policy', 
                values_to = 'cost')
 
@@ -244,9 +256,19 @@ policy_compare_df <- policy_compare_df %>% # remove initial column and pivot lon
 # Graph x against cost of both policies
 ggplot(policy_compare_df, aes(x = x, y = cost)) +
   geom_line(aes(color = policy)) +
-  theme_minimal()
+  scale_color_manual(values = c('steelblue4', 'firebrick4')) +
+  theme_minimal() +
+  labs(x = 'Cost of Policy B', y = 'Present Value per Policy (USD)', color = 'Policy')
+
+# The in-line text called below the graph is `r a_pv - b_pv`
 ```
 
 **Figure 5.** Comparing the societal cost of pursuing Climate Policy A vs. Climate Policy B as a function of the implementation cost of Climate Policy B.
 
-Policy B leads to less societal cost considering climate damages and policy implementation costs when implementation costs are less than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`. Thus, I recommend Congress pursue Policy B if expected implementation costs of the policy are less than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`, and I recommend Congress pursue Policy A if expected implementation costs of Policy B are more than `r round((0.5*policy_compare_f(warming_df$damages_baseline) + 0.5*policy_compare_f(warming_df$damages_baseline_1.5)) - policy_compare_f(warming_df$damages_baseline_b), 2)`.
+Policy B leads to less societal cost considering climate damages and policy implementation costs when implementation costs are less than `r a_pv - b_pv`. Thus, I recommend Congress pursue Policy B if expected implementation costs of the policy are less than `r a_pv - b_pv`, and I recommend Congress pursue Policy A if expected implementation costs of Policy B are more than `r a_pv - b_pv`.
+
+### Question 6
+
+The greater Congress's risk aversion, the more attractive Policy B will be. Risk aversion means a diminishing marginal utility of monetary payoff. This means that the utility from the high monetary payoff that has a 50% likelihood of occurring in Policy A will become relatively less valuable. The payoff from Policy B will also go down in terms of utility, but because B's payoff is smaller than A's payoff, the utility of Policy B's payoff will decrease less in relative terms than the decrease in utility of Policy A's payoff.
+
+If Congress is risk averse, the implementation cost of Policy B that tips it from favorable to unfavorable is higher than if Congress is risk neutral. However, whether Congress pursues Policy A or Policy B still depends on the implementation cost of Policy B and Congress's degree of risk aversion.
